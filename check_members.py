@@ -74,10 +74,10 @@ print(f"Network: {BLOCKCHAIN_PROVIDER}")
 print(f"Chain ID: {chain_id}")
 print()
 
-# Get total number of members
+# Get total number of members (includes inactive)
 try:
     member_count = contract.functions.getMembersCount().call()
-    print(f"Total Registered Members: {member_count}")
+    print(f"Total Registered Members (including inactive): {member_count}")
     print()
     
     if member_count == 0:
@@ -91,16 +91,26 @@ try:
         print("-" * 80)
         print()
         
-        # Get details for each member
+        # Get details for each member and filter active ones
+        active_count = 0
         for i in range(member_count):
             host = contract.functions.members(i).call()
             
-            # Get member details
+            # Get member details - check if active first
             try:
+                # Get member details tuple: (imageName, active, encryptedMemory)
+                member_details = contract.functions.getMemberDetails(host).call()
+                is_active = member_details[1]  # Second element is 'active' boolean
+                
+                # Skip inactive members
+                if not is_active:
+                    continue
+                
+                active_count += 1
                 encrypted_memory = contract.functions.getMemberEncryptedMemory(host).call()
                 container_count = contract.functions.memberContainerCount(Web3.keccak(text=host)).call()
                 
-                print(f"{i+1}. Host/Peer ID: {host}")
+                print(f"{active_count}. Host/Peer ID: {host}")
                 
                 # Show assigned containers
                 if container_count > 0:
@@ -119,6 +129,13 @@ try:
                 print(f"   Error getting member details: {e}")
                 print()
         
+        # Show summary
+        if active_count == 0:
+            print("✓ All members have been removed (0 active members)")
+            print()
+        else:
+            print(f"Total Active Members: {active_count} out of {member_count} registered")
+        
         # Get image deployments
         print("-" * 80)
         print("IMAGE DEPLOYMENTS:")
@@ -133,6 +150,8 @@ try:
                 print()
                 print("Deploy an image via the dashboard at http://localhost:3000")
             else:
+                # Collect active images only
+                active_images = []
                 for i in range(image_count):
                     image_name = contract.functions.images(i).call()
                     
@@ -143,13 +162,25 @@ try:
                         deployed = details[1]
                         active = details[2]
                         
-                        print(f"{i+1}. {image_name}")
-                        print(f"   Requested Replicas: {replicas}")
-                        print(f"   Deployed: {deployed}")
-                        print(f"   Status: {'Active' if active else 'Inactive'}")
-                        print()
+                        # Only show active images
+                        if active:
+                            active_images.append({
+                                'name': image_name,
+                                'replicas': replicas,
+                                'deployed': deployed
+                            })
                     except Exception as e:
                         print(f"   Error getting image details: {e}")
+                
+                if len(active_images) == 0:
+                    print("No active images deployed.")
+                    print()
+                else:
+                    for idx, img in enumerate(active_images):
+                        print(f"{idx+1}. {img['name']}")
+                        print(f"   Requested Replicas: {img['replicas']}")
+                        print(f"   Deployed: {img['deployed']}")
+                        print(f"   Status: Active")
                         print()
         except Exception as e:
             print(f"Error getting image deployments: {e}")
