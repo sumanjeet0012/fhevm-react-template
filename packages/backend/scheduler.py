@@ -81,6 +81,41 @@ class CanteenScheduler:
         
         raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_attempts}")
     
+    def _get_account_address(self):
+        """Get account address (handles both Account object and string address)."""
+        if isinstance(self.account, str):
+            return self.account
+        return self.account.address
+    
+    async def _send_transaction(self, tx_function):
+        """Send a transaction, handling both localhost and remote providers.
+        
+        Args:
+            tx_function: Contract function ready to be called
+            
+        Returns:
+            (tx_hash, receipt) tuple
+        """
+        if isinstance(self.account, str):
+            # Localhost with Ganache - use .transact()
+            tx_hash = tx_function.transact({
+                'from': self.account,
+                'gas': 6000000
+            })
+        else:
+            # Remote provider (Sepolia/Infura) - sign locally
+            tx = tx_function.build_transaction({
+                'from': self.account.address,
+                'gas': 6000000,
+                'gasPrice': self.w3.eth.gas_price,
+                'nonce': self.w3.eth.get_transaction_count(self.account.address)
+            })
+            signed_tx = self.account.sign_transaction(tx)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        return tx_hash, receipt
+    
     async def initialize(self):
         """Initialize the scheduler components."""
         logger.info("Initializing scheduler...")
@@ -100,11 +135,11 @@ class CanteenScheduler:
         
         # Get account
         if self.private_key:
-            account = self.w3.eth.account.from_key(self.private_key)
-            self.account = account.address
-            logger.info(f"Using private key account: {self.account}")
+            # For Sepolia/Infura: Store account object for signing
+            self.account = self.w3.eth.account.from_key(self.private_key)
+            logger.info(f"Using private key account: {self.account.address}")
         else:
-            # Use first Ganache account
+            # For localhost: Use first Ganache account (address string)
             accounts = self.w3.eth.accounts
             if not accounts:
                 raise Exception("No accounts available in Ganache")
@@ -199,17 +234,11 @@ class CanteenScheduler:
             encrypted_hex = self.fhe_helper.format_for_contract(encrypted_memory)
             logger.info(f"✓ Memory encrypted (ciphertext size: {len(encrypted_hex)} bytes)")
             
-            # Call addMember function with encrypted memory
-            tx_hash = self.contract.functions.addMember(
-                host_id, 
-                encrypted_hex
-            ).transact({
-                'from': self.account,
-                'gas': 5000000
-            })
-            
-            # Wait for transaction receipt
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            # Send transaction (works with both localhost and Sepolia)
+            tx_hash, receipt = await self._send_transaction(
+                self.contract.functions.addMember(host_id, encrypted_hex)
+            )
+            logger.info(f"📝 Transaction sent: {tx_hash.hex()[:10]}...")
             
             if receipt.status == 1:
                 logger.info(f"✓ Node registered with encrypted memory (tx: {tx_hash.hex()[:10]}...)")
@@ -455,16 +484,10 @@ class CanteenScheduler:
             encrypted_memory = self.fhe_helper.encrypt_memory(self.memory_mb)
             encrypted_hex = self.fhe_helper.format_for_contract(encrypted_memory)
             
-            # Update contract with new encrypted memory
-            tx_hash = self.contract.functions.updateMemberMemory(
-                host_id,
-                encrypted_hex
-            ).transact({
-                'from': self.account,
-                'gas': 5000000  # Increased for large encrypted data
-            })
-            
-            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            # Send transaction (works with both localhost and Sepolia)
+            tx_hash, receipt = await self._send_transaction(
+                self.contract.functions.updateMemberMemory(host_id, encrypted_hex)
+            )
             
             if receipt.status == 1:
                 logger.info(f"✓ Memory updated in contract (tx: {tx_hash.hex()[:10]}...)")
@@ -500,10 +523,25 @@ class CanteenScheduler:
                 else:
                     logger.info("Node has no image assigned, unregistering...")
                 
-                tx_hash = self.contract.functions.removeMember(host_id).transact({
-                    'from': self.account,
-                    'gas': 6000000  # Optimized contract
-                })
+                # Note: We can't use await in a sync function passed to trio.to_thread.run_sync
+                # So we'll build and send the transaction directly here
+                if isinstance(self.account, str):
+                    # Localhost with Ganache
+                    tx_hash = self.contract.functions.removeMember(host_id).transact({
+                        'from': self.account,
+                        'gas': 6000000
+                    })
+                else:
+                    # Remote provider - sign locally
+                    tx = self.contract.functions.removeMember(host_id).build_transaction({
+                        'from': self.account.address,
+                        'gas': 6000000,
+                        'gasPrice': self.w3.eth.gas_price,
+                        'nonce': self.w3.eth.get_transaction_count(self.account.address)
+                    })
+                    signed_tx = self.account.sign_transaction(tx)
+                    tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+                
                 receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
                 return tx_hash, receipt
             
