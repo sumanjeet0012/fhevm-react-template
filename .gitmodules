@@ -1,4 +1,4 @@
 [submodule "packages/hardhat"]
         path = packages/hardhat
-        url = https://github.com/seetadev/fhevm-hardhat-veil-stack.git
+        url = https://github.com/sumanjeet0012/hardhat.git
         branch = main
