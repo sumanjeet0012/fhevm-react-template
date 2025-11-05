@@ -331,8 +331,11 @@ export const CanteenDashboard = () => {
             <p className="font-mono text-sm break-all">{canteen.contractAddress || "N/A"}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Operator Nodes</p>
+            <p className="text-sm text-gray-500">Active Operator Nodes</p>
             <p className="text-2xl font-bold text-[#FFD208]">{canteen.membersCount}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {canteen.membersCount === 0 ? "No active nodes" : `${canteen.membersCount} node(s) online`}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Deployed Images</p>
@@ -446,16 +449,16 @@ export const CanteenDashboard = () => {
 
       {/* Operator Nodes Info */}
       <div className={cardClass}>
-        <h2 className={titleClass}>Operator Nodes</h2>
+        <h2 className={titleClass}>Active Operator Nodes</h2>
         <p className="text-gray-600 mb-4">
           {canteen.membersCount > 0
-            ? `${canteen.membersCount} operator node(s) registered and ready to deploy containers.`
-            : "No operator nodes registered yet. Start Python operators to register nodes."}
+            ? `${canteen.membersCount} active operator node(s) online and ready to deploy containers.`
+            : "No active operator nodes. Start Python operators to register nodes."}
         </p>
         {canteen.membersCount > 0 && (
           <div className="bg-green-50 border-l-4 border-green-400 p-4">
             <p className="text-green-700">
-              ✅ Operator nodes are running and monitoring the blockchain for deployment requests.
+              ✅ {canteen.membersCount} operator node(s) actively monitoring the blockchain for deployment requests.
             </p>
           </div>
         )}

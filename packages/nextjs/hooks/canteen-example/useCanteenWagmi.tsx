@@ -72,19 +72,31 @@ export const useCanteenWagmi = (parameters: {
     chainId: allowedChainId,
   });
 
-  // Fetch all members
+  // Fetch all members (filter only active ones)
   useEffect(() => {
     const fetchMembers = async () => {
-      if (!canteenContract || !membersCount) return;
+      if (!canteenContract || !membersCount || !ethersReadonlyProvider) return;
       
       const membersList: string[] = [];
       const count = Number(membersCount);
       
+      const contract = new (await import("ethers")).Contract(
+        canteenContract.address,
+        canteenContract.abi,
+        ethersReadonlyProvider
+      );
+      
       for (let i = 0; i < count; i++) {
         try {
-          // We'll need to add a getter function to the contract or read from events
-          // For now, we'll use a placeholder
-          membersList.push(`Member ${i}`);
+          const memberHost = await contract.members(i);
+          // getMemberDetails returns: (imageName, active, encryptedMemory)
+          const memberDetails = await contract.getMemberDetails(memberHost);
+          const isActive = memberDetails[1]; // Second element is 'active' boolean
+          
+          // Only include active members
+          if (isActive) {
+            membersList.push(memberHost);
+          }
         } catch (error) {
           console.error(`Error fetching member ${i}:`, error);
         }
@@ -94,9 +106,9 @@ export const useCanteenWagmi = (parameters: {
     };
 
     fetchMembers();
-  }, [canteenContract, membersCount, refreshTrigger]);
+  }, [canteenContract, membersCount, refreshTrigger, ethersReadonlyProvider]);
 
-  // Fetch all images with deployment info
+  // Fetch all images with deployment info (filter only active images)
   useEffect(() => {
     const fetchImages = async () => {
       if (!canteenContract || !imagesCount || !ethersReadonlyProvider) return;
@@ -115,12 +127,17 @@ export const useCanteenWagmi = (parameters: {
           const imageName = await contract.images(i);
           // getImageDetails returns: (replicas, deployed, active)
           const imageDetails = await contract.getImageDetails(imageName);
-          imagesList.push({
-            name: imageName,
-            replicas: Number(imageDetails[0]),
-            deployed: Number(imageDetails[1]),
-            active: imageDetails[2]
-          });
+          const isActive = imageDetails[2];
+          
+          // Only include active images
+          if (isActive) {
+            imagesList.push({
+              name: imageName,
+              replicas: Number(imageDetails[0]),
+              deployed: Number(imageDetails[1]),
+              active: true
+            });
+          }
         } catch (error) {
           console.error(`Error fetching image ${i}:`, error);
         }
@@ -224,8 +241,9 @@ export const useCanteenWagmi = (parameters: {
     isConnected,
     members,
     images,
-    membersCount: membersCount ? Number(membersCount) : 0,
-    imagesCount: imagesCount ? Number(imagesCount) : 0,
+    // Return active counts (arrays already filtered for active only)
+    membersCount: members.length,
+    imagesCount: images.length, // Use filtered images count instead of raw contract count
     contractAddress: canteenContract?.address,
     
     // Actions
