@@ -631,7 +631,7 @@ const deployedContracts = {
   },
   11155111: {
     Canteen: {
-      address: "0xE0999A91834cbF74d8ad8ededa368E397081e0aa",
+      address: "0x7F07696f852992cA61E8E08776BB17807540eA68",
       abi: [
         {
           inputs: [],
@@ -1181,7 +1181,7 @@ const deployedContracts = {
         },
       ],
       inheritedFunctions: {},
-      deployedOnBlock: 9530436,
+      deployedOnBlock: 9568116,
     },
     CanteenFHEVM: {
       address: "0xad42fdE4D1886169370C89ebe74791Df7Ee326F9",
