@@ -15,7 +15,7 @@ class Config:
     def __init__(self):
         """Initialize configuration."""
         self.blockchain_provider = os.getenv('BLOCKCHAIN_PROVIDER', 'http://localhost:7545')
-        self.contract_address = os.getenv('CONTRACT_ADDRESS', '0xF3C0eb6bfc9faa44014975baA2Bf7Dc143D90c2B')
+        self.contract_address = os.getenv('CONTRACT_ADDRESS', '0xad42fdE4D1886169370C89ebe74791Df7Ee326F9')
         self.private_key = os.getenv('PRIVATE_KEY', '')
         
         # FHE configuration
